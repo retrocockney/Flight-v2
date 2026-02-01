@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Combat Game</title>
+<style>
+  body { margin: 0; overflow: hidden; background: skyblue; }
+  canvas { display: block; background: #87ceeb; }
+  #health { position: absolute; top: 10px; left: 10px; font: bold 18px sans-serif; color: red; }
+  #score { position: absolute; top: 10px; right: 10px; font: bold 18px sans-serif; color: black; }
+</style>
+</head>
+<body>
+<div id="health">Health: 3</div>
+<div id="score">Score: 0</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let player = {
+    x: canvas.width/2,
+    y: canvas.height - 100,
+    width: 60,
+    height: 30,
+    speed: 5,
+    health: 3
+};
+
+let keys = {};
+let missiles = [];
+let enemyPlanes = [];
+let enemyBullets = [];
+let score = 0;
+
+// Controls
+window.addEventListener('keydown', (e) => keys[e.key] = true);
+window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+function spawnEnemy() {
+    const enemy = {
+        x: Math.random() * (canvas.width - 60),
+        y: -50,
+        width: 60,
+        height: 30,
+        speed: 2,
+        shootCooldown: 100 + Math.random()*100
+    };
+    enemyPlanes.push(enemy);
+}
+
+function shootMissile() {
+    missiles.push({ x: player.x + player.width/2 - 5, y: player.y, width: 10, height: 20, speed: 7 });
+}
+
+function shootEnemyBullet(enemy) {
+    enemyBullets.push({ x: enemy.x + enemy.width/2 - 5, y: enemy.y + enemy.height, width: 10, height: 15, speed: 4 });
+}
+
+function update() {
+    // Player movement
+    if (keys['ArrowUp']) player.y -= player.speed;
+    if (keys['ArrowDown']) player.y += player.speed;
+    if (keys['ArrowLeft']) player.x -= player.speed;
+    if (keys['ArrowRight']) player.x += player.speed;
+    if (keys['s'] || keys['S']) shootMissile();
+
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+
+    // Update missiles
+    missiles.forEach((m, i) => {
+        m.y -= m.speed;
+        if (m.y + m.height < 0) missiles.splice(i, 1);
+    });
+
+    // Update enemy planes
+    enemyPlanes.forEach((e, i) => {
+        e.y += e.speed;
+        e.shootCooldown--;
+        if (e.shootCooldown <= 0) {
+            shootEnemyBullet(e);
+            e.shootCooldown = 100 + Math.random()*100;
+        }
+        if (e.y > canvas.height) enemyPlanes.splice(i, 1);
+    });
+
+    // Update enemy bullets
+    enemyBullets.forEach((b, i) => {
+        b.y += b.speed;
+        if (b.y > canvas.height) enemyBullets.splice(i, 1);
+    });
+
+    // Check collisions (missiles hit enemies)
+    missiles.forEach((m, mi) => {
+        enemyPlanes.forEach((e, ei) => {
+            if (m.x < e.x + e.width && m.x + m.width > e.x &&
+                m.y < e.y + e.height && m.y + m.height > e.y) {
+                missiles.splice(mi, 1);
+                enemyPlanes.splice(ei, 1);
+                score++;
+                document.getElementById('score').innerText = "Score: " + score;
+            }
+        });
+    });
+
+    // Check collisions (enemy bullets hit player)
+    enemyBullets.forEach((b, bi) => {
+        if (b.x < player.x + player.width && b.x + b.width > player.x &&
+            b.y < player.y + player.height && b.y + b.height > player.y) {
+            enemyBullets.splice(bi, 1);
+            player.health--;
+            document.getElementById('health').innerText = "Health: " + player.health;
+            if (player.health <= 0) {
+                alert("Game Over! Your score: " + score);
+                location.reload();
+            }
+        }
+    });
+
+    // Randomly spawn enemies
+    if (Math.random() < 0.02) spawnEnemy();
+}
+
+function drawPlane(x, y, width, height, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + width, y + height/2);
+    ctx.lineTo(x, y + height);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw player
+    drawPlane(player.x, player.y, player.width, player.height, "red");
+
+    // Draw missiles
+    missiles.forEach(m => {
+        ctx.fillStyle = "yellow";
+        ctx.fillRect(m.x, m.y, m.width, m.height);
+    });
+
+    // Draw enemies
+    enemyPlanes.forEach(e => drawPlane(e.x, e.y, e.width, e.height, "black"));
+
+    // Draw enemy bullets
+    enemyBullets.forEach(b => {
+        ctx.fillStyle = "blue";
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+    });
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
